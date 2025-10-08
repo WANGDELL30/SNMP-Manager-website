@@ -16,6 +16,9 @@
 # adnan belom mandi anjing
 #pip tolong rapihin
 
+# udah ni goblok
+
+
 from __future__ import annotations
 
 import os

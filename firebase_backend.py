@@ -13,7 +13,7 @@
 # -----------------------------------------------------------------------------
 
 # coding salah
-#pip tolongin gue
+# adnan belom mandi anjing
 
 from __future__ import annotations
 

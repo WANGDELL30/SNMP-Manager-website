@@ -13,6 +13,7 @@
 # -----------------------------------------------------------------------------
 
 # coding salah
+#pip tolongin gue
 
 from __future__ import annotations
 

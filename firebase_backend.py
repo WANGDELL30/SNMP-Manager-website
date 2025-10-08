@@ -13,6 +13,7 @@
 # -----------------------------------------------------------------------------
 
 # coding salah
+# adnan belom mandi anjing
 
 from __future__ import annotations
 

@@ -1,0 +1,11 @@
+#folder ga penting
+Notepad SNMP
+Debugging training
+
+#service account and secrets
+serviceAccountKey.json
+
+#venv
+.venv
+venv
+__pycache__

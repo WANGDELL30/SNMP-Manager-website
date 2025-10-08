@@ -1,0 +1,7 @@
+flask
+flask-cors
+snmpy
+firebase-admin
+google-cloud-firestore
+google-api-core
+waitress

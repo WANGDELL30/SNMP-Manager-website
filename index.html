@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SNMP Manager Pro — Firestore + Direct SNMP</title>
+
+  <!-- Tailwind & Chart.js -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- OVERRIDES (ISI DI SINI agar mudah) -->
+  <script>
+    // window.__backend_base_url = "http://127.0.0.1:5000";
+    // window.__app_id = "default-app-id";
+    // window.__firebase_config = JSON.stringify({...});
+  </script>
+
+  <!-- CSP -->
+  <meta http-equiv="Content-Security-Policy"
+        content="
+          default-src 'self';
+          script-src 'self' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://www.gstatic.com https://www.googletagmanager.com https://apis.google.com 'unsafe-inline';
+          script-src-elem 'self' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://www.gstatic.com https://www.googletagmanager.com https://apis.google.com 'unsafe-inline';
+          connect-src 'self' http://127.0.0.1:* http://localhost:* https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://*;
+          style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+          font-src https://fonts.gstatic.com;
+          img-src 'self' data:;
+          frame-src 'self' https://apis.google.com;
+        ">
+
+  <style>
+    *{box-sizing:border-box}
+    body{font-family:'Inter',sans-serif;background:linear-gradient(135deg,#0f172a,#1e293b 50%,#334155);min-height:100vh;overflow-x:hidden}
+    .glass{background:rgba(30,41,59,.7);backdrop-filter:blur(20px);border:1px solid rgba(148,163,184,.2);border-radius:1.25rem;box-shadow:0 25px 50px -12px rgba(0,0,0,.5)}
+    .btn{border-radius:9999px;font-weight:600;padding:.6rem 1.2rem}
+    .btn-1{background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff}
+    .btn-2{background:linear-gradient(135deg,#10b981,#059669);color:#fff}
+    .btn-3{background:linear-gradient(135deg,#64748b,#475569);color:#fff}
+    .page{display:none}.page.active{display:block}
+    .chart-wrap{height:320px;border-radius:1rem;padding:1rem;border:1px solid rgba(148,163,184,.2);background:rgba(30,41,59,.5)}
+    .badge{font-size:.75rem;padding:.15rem .5rem;background:rgba(148,163,184,.2);border-radius:999px;color:#cbd5e1}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,'Liberation Mono','Courier New',monospace}
+    .input{background:#0b1220;color:#fff;padding:.5rem .75rem;border-radius:.5rem;border:1px solid rgba(148,163,184,.25);outline:0;width:100%}
+    .select{background:#0b1220;color:#fff;padding:.5rem .75rem;border-radius:.5rem;border:1px solid rgba(148,163,184,.25);outline:0;width:100%}
+  </style>
+
+  <script>
+  // URL backend & APP_ID (override lewat window.__backend_base_url / __app_id / __firebase_config di atas)
+  window.__backend_base_url = "http://127.0.0.1:5000";
+  window.__app_id = "default-app-id";
+
+  window.__firebase_config = JSON.stringify({
+    apiKey: "AIzaSyB2ZZdXxaoT0OVvQlC2NLO27NZz7bE5JU4",
+    authDomain: "snmpmanager-55c9d.firebaseapp.com",
+    projectId: "snmpmanager-55c9d",
+    storageBucket: "snmpmanager-55c9d.appspot.com",
+    messagingSenderId: "461264039931",
+    appId: "1:461264039931:web:9cc33bc0ebce75a294a55e",
+    measurementId: "G-ZK5Q3DC9F5"
+  });
+</script>
+
+
+  <!-- FIREBASE MODULE -->
+  <script type="module">
+    // #region IMPORTS
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import {
+      getFirestore, collection, addDoc, serverTimestamp, setLogLevel,
+      onSnapshot, query, orderBy, limit, where, Timestamp
+    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    // #endregion
+
+    // #region EXPOSE SDK
+    setLogLevel('debug');
+    window.initializeApp = initializeApp;
+    window.getFirestore = getFirestore;
+    window.collection = collection;
+    window.addDoc = addDoc;
+    window.serverTimestamp = serverTimestamp;
+    window.onSnapshot = onSnapshot;
+    window.query = query;
+    window.orderBy = orderBy;
+    window.limit = limit;
+    window.where = where;
+    window.Timestamp = Timestamp;
+    window.getAuth = getAuth;
+    window.signInAnonymously = signInAnonymously;
+    window.onAuthStateChanged = onAuthStateChanged;
+    // #endregion
+
+    // #region GLOBALS
+    window.appId = (typeof __app_id!=='undefined' && __app_id) ? __app_id : 'default-app-id';
+    window.OID_TEMPLATE = {
+      "1.3.6.1.4.1.9999.1.2.0": { name:"temperature", unit:"°C",  category:"environment", decimals:2 },
+      "1.3.6.1.4.1.9999.1.2.1": { name:"humidity",    unit:"%RH", category:"environment", decimals:2 },
+      "1.3.6.1.4.1.9999.1.2.2": { name:"voltage",     unit:"V",   category:"power",       decimals:2 },
+      "1.3.6.1.4.1.9999.1.2.3": { name:"current",     unit:"A",   category:"power",       decimals:2 },
+    };
+    // #endregion
+
+    // #region INIT FIREBASE
+    const cfgFromOverride = (typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null);
+    const firebaseConfig = cfgFromOverride || {
+      apiKey: "REPLACE_ME",
+      authDomain: "REPLACE_ME",
+      projectId: "REPLACE_ME",
+    };
+
+    window.isFirebaseReady=false; window.db=null; window.auth=null; window.userId=null;
+
+    async function initFirebase(){
+      try{
+        const app = initializeApp(firebaseConfig);
+        window.auth = getAuth(app);
+        window.db   = getFirestore(app);
+        await signInAnonymously(window.auth);
+        onAuthStateChanged(window.auth,(user)=>{
+          window.userId = user? user.uid:null;
+          const el=document.getElementById('user-id');
+          if(el && user) el.textContent=`Logged in: ${user.uid}`;
+          window.isFirebaseReady=true;
+          logLine(`# Firebase ready (appId=${window.appId})`);
+        });
+      }catch(e){
+        console.error(e);
+        logLine(`# Firebase init error: ${e?.message||e}`);
+      }
+    }
+    initFirebase();
+    // #endregion
+
+    // #region NORMALIZER
+    function toNumber(x){const n=typeof x==='number'?x:parseFloat(x);return Number.isFinite(n)?n:null}
+    function toISO(ts){
+      try{
+        if(!ts) return new Date().toISOString();
+        if(typeof ts.toDate==='function') return ts.toDate().toISOString();
+        if(typeof ts==='string') return new Date(ts).toISOString();
+        if(typeof ts==='number') return new Date(ts).toISOString();
+        if(typeof ts.seconds==='number') return new Date(ts.seconds*1000).toISOString();
+      }catch{}
+      return new Date().toISOString();
+    }
+    window.normalizeDocToRows=function(doc){
+      const d=doc||{}; const tsISO=toISO(d.serverTimestamp||d.ts);
+      const ip=d.ip||"firebase"; const port=(d.port??"—");
+      if(Array.isArray(d.rows)&&d.rows.length){return d.rows.map(r=>({
+        name:r.name||window.OID_TEMPLATE[r.oid]?.name||r.oid, oid:r.oid,
+        value:(typeof r.value==='number'?r.value:(toNumber(r.value)??r.value)),
+        unit:r.unit??window.OID_TEMPLATE[r.oid]?.unit??"", type:r.type||"",
+        category:r.category||window.OID_TEMPLATE[r.oid]?.category||"misc", ts:tsISO, ip, port
+      }));}
+      if(Array.isArray(d.results)&&d.results.length){return d.results.map(r=>{
+        const t=window.OID_TEMPLATE[r.oid]||{}; const num=toNumber(r.value);
+        return{ name:r.name||t.name||r.oid, oid:r.oid,
+          value:(num==null?r.value:Number(num.toFixed(t.decimals??2))),
+          unit:t.unit||"", type:r.type||"", category:t.category||"misc", ts:tsISO, ip, port };
+      });}
+      return [];
+    }
+    // #endregion
+
+    // #region FIRESTORE LISTENER with filtering
+    window.startFirestoreListener=function({onRows,maxDocs=200,timeWindowMinutes=null}={}){
+      if(!window.db){logLine('# Firestore not ready'); return ()=>{}}
+      const colPath=`artifacts/${window.appId}/public/data/sensor-readings-from-backend`;
+      logLine(`# Listening: ${colPath}`);
+
+      const colRef=collection(window.db,colPath);
+      let qRef;
+      try{
+        if(timeWindowMinutes && Number(timeWindowMinutes)>0){
+          const start=new Date(Date.now()-Number(timeWindowMinutes)*60*1000);
+          const ts=Timestamp.fromDate(start);
+          qRef=query(colRef, where("serverTimestamp", ">=", ts), orderBy("serverTimestamp","desc"), limit(maxDocs));
+        }else{
+          qRef=query(colRef, orderBy("serverTimestamp","desc"), limit(maxDocs));
+        }
+      }catch(e){
+        // Fallback if index missing
+        qRef=query(colRef, orderBy("serverTimestamp","desc"), limit(maxDocs));
+        logLine('# FYI: where(serverTimestamp>=) fallback to client-side filter (index likely missing)');
+      }
+
+      const seen=new Set();
+      return onSnapshot(qRef,(snap)=>{
+        const agg=[];
+        const minDate = (timeWindowMinutes && Number(timeWindowMinutes)>0) ? new Date(Date.now()-Number(timeWindowMinutes)*60*1000) : null;
+        snap.forEach(doc=>{
+          if(seen.has(doc.id)) return;
+          seen.add(doc.id);
+          const rows=window.normalizeDocToRows(doc.data());
+          if(rows.length){
+            const filtered = (!minDate) ? rows : rows.filter(r=>{
+              const d=new Date(r.ts); return d>=minDate;
+            });
+            if(filtered.length) {
+              filtered.forEach(r=>{ if(!r.source) r.source='firestore'; });
+              agg.push(...filtered);
+            }
+          }
+        });
+        if(agg.length && typeof onRows==='function') onRows(agg);
+      },(err)=>{console.error(err);logLine(`# onSnapshot error: ${err?.message||err}`)});
+    }
+    // #endregion
+  </script>
+</head>
+
+<body class="p-6">
+  <div class="max-w-6xl mx-auto">
+    <header class="text-center mb-6">
+      <h1 class="text-4xl font-bold text-white mb-1">SNMP Manager Pro</h1>
+      <p class="text-gray-400">Firestore-driven OID Table & Charts + Direct SNMP Controls</p>
+    </header>
+
+    <!-- NAV -->
+    <div class="glass p-3 mb-6">
+      <div class="flex gap-3 justify-center">
+        <button class="btn btn-3" onclick="showPage('snmp-table')">SNMP TABLE</button>
+        <button class="btn btn-1" onclick="showPage('sensor-monitoring')">SENSOR MONITORING</button>
+      </div>
+    </div>
+
+    <!-- SNMP CONTROLS -->
+    <div class="glass p-5 mb-6">
+      <h2 class="text-white text-xl font-semibold mb-3">SNMP Controls (Direct → Backend)</h2>
+      <div class="grid md:grid-cols-3 gap-4">
+        <div><label class="text-gray-400">Agent IP</label><input id="ip" value="127.0.0.1" class="input"/></div>
+        <div><label class="text-gray-400">Port</label><input id="port" type="number" value="161" class="input"/></div>
+        <div><label class="text-gray-400">Community</label><input id="community" value="public" class="input"/></div>
+        <div>
+          <label class="text-gray-400">Version</label>
+          <select id="version" class="select">
+            <option value="v2c" selected>v2c</option>
+            <option value="v1">v1</option>
+            <option value="v3">v3</option>
+          </select>
+        </div>
+        <div><label class="text-gray-400">OID / Base OID</label><input id="oid" value="1.3.6.1.4.1.9999.1.2" class="input"/></div>
+        <div class="flex items-end gap-3">
+          <button class="btn btn-1" onclick="runOp('get')">GET</button>
+          <button class="btn btn-1" onclick="runOp('getnext')">GETNEXT</button>
+          <button class="btn btn-1" onclick="runOp('walk')">WALK</button>
+          <button class="btn btn-3" onclick="doSet()">SET</button>
+        </div>
+      </div>
+
+      <div class="mt-4 grid md:grid-cols-5 gap-3">
+        <div><label class="text-gray-400">v3 User</label><input id="v3_user" class="input" placeholder="(optional)"/></div>
+        <div>
+          <label class="text-gray-400">Auth</label>
+          <select id="v3_auth" class="select">
+            <option>NONE</option><option>SHA</option><option>MD5</option>
+          </select>
+        </div>
+        <div><label class="text-gray-400">Auth Key</label><input id="v3_authKey" class="input"/></div>
+        <div>
+          <label class="text-gray-400">Priv</label>
+          <select id="v3_priv" class="select">
+            <option>NONE</option><option>AES128</option>
+          </select>
+        </div>
+        <div><label class="text-gray-400">Priv Key</label><input id="v3_privKey" class="input"/></div>
+      </div>
+    </div>
+
+    <!-- TABLE -->
+    <div id="snmp-table" class="page active">
+      <div class="glass p-5">
+        <div class="flex flex-col gap-3 mb-4">
+          <div class="flex justify-between items-center">
+            <h2 class="text-2xl font-semibold text-white">SNMP Table</h2>
+            <span class="badge" id="live-badge">LIVE</span>
+          </div>
+          <div class="grid md:grid-cols-4 gap-3">
+            <div class="flex items-end gap-2">
+              <button class="btn btn-3" onclick="clearTable()">Clear</button>
+              <button class="btn btn-2" id="toggle-live-btn" onclick="toggleLive()">Pause Live</button>
+              <button class="btn btn-3" onclick="exportCSV()">Export CSV</button>
+            </div>
+            <div>
+              <label class="text-gray-400">Time range</label>
+              <select id="time-window" class="select">
+                <option value="0">All</option>
+                <option value="5">Last 5 minutes</option>
+                <option value="15" selected>Last 15 minutes</option>
+                <option value="60">Last 1 hour</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-gray-400">Search OID / Name</label>
+              <input id="filter-search" class="input" placeholder="e.g. 1.3.6... or temperature"/>
+            </div>
+            <div>
+              <label class="text-gray-400">IP contains</label>
+              <input id="filter-ip" class="input" placeholder="e.g. 127.0.0.1"/>
+            </div>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="min-w-full text-sm text-gray-200">
+            <thead class="bg-slate-800/60">
+              <tr>
+                <th class="p-2 text-left">#</th>
+                <th class="p-2 text-left">Name</th>
+                <th class="p-2 text-left">OID</th>
+                <th class="p-2 text-left">Value</th>
+                <th class="p-2 text-left">Unit</th>
+                <th class="p-2 text-left">Type</th>
+                <th class="p-2 text-left">Category</th>
+                <th class="p-2 text-left">Src</th>
+                <th class="p-2 text-left">IP:Port</th>
+                <th class="p-2 text-left">Time</th>
+              </tr>
+            </thead>
+            <tbody id="table-body"></tbody>
+          </table>
+        </div>
+
+        <div class="mt-4 glass p-3">
+          <div class="text-xs text-gray-400">Logs</div>
+          <pre id="log" class="mono text-gray-300 mt-1"></pre>
+          <div id="user-id" class="text-gray-400 mt-2 text-sm"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHARTS -->
+    <div id="sensor-monitoring" class="page">
+      <div class="glass p-5">
+        <h2 class="text-2xl font-semibold text-white mb-4">Live Sensor Monitoring</h2>
+        <div class="grid md:grid-cols-2 gap-6">
+          <div><h3 class="text-white mb-2">Temperature & Humidity</h3><div class="chart-wrap"><canvas id="tempHumidityChart"></canvas></div></div>
+          <div><h3 class="text-white mb-2">Voltage & Current</h3><div class="chart-wrap"><canvas id="voltageCurrentChart"></canvas></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- APP LOGIC -->
+  <script>
+    // Helpers
+function showPage(id){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById(id).classList.add('active'); if(id==='sensor-monitoring') initializeCharts();}
+function logLine(s){const el=document.getElementById('log'); if(!el) return; el.textContent=(el.textContent?el.textContent+"\n":"")+s;}
+function getBackendUrl(path){const base=(typeof __backend_base_url!=='undefined'&&__backend_base_url)?__backend_base_url:"http://127.0.0.1:5000"; return base.replace(/\/$/,'')+path;}
+
+    // Debounce helper
+    function debounce(fn, wait){ let t; return (...args)=>{ clearTimeout(t); t=setTimeout(()=>fn.apply(this,args), wait); }; }
+
+    // Persist filters (localStorage)
+    function saveFilters(){
+      localStorage.setItem('snmpFilters', JSON.stringify({
+        search: document.getElementById('filter-search')?.value || '',
+        ip: document.getElementById('filter-ip')?.value || '',
+        timeWindow: document.getElementById('time-window')?.value || '15',
+        livePaused: window.livePaused ? 1 : 0,
+      }));
+    }
+    function loadFilters(){
+      const data = JSON.parse(localStorage.getItem('snmpFilters') || '{}');
+      if(data.search) document.getElementById('filter-search').value = data.search;
+      if(data.ip) document.getElementById('filter-ip').value = data.ip;
+      if(data.timeWindow) document.getElementById('time-window').value = data.timeWindow;
+      if(typeof data.livePaused!== 'undefined' && Number(data.livePaused)===1){
+        // set paused state but do actual unsubscribe later
+        window.livePaused = true; 
+        const btn=document.getElementById('toggle-live-btn'); const badge=document.getElementById('live-badge');
+        if(btn&&badge){ btn.textContent='Resume Live'; badge.textContent='PAUSED'; badge.style.background='rgba(239,68,68,.25)'; }
+      }
+    }
+
+    // Filters + State
+    let tableData=[]; window.livePaused=window.livePaused||false;
+    let fsOptions={timeWindowMinutes:15}; // default 15m
+    const rowSeen=new Set();
+
+    function rowKey(r){return `${r.oid}|${r.ts}|${r.ip}|${r.port}|${r.value}`}
+    function getFilters(){
+      const q=(document.getElementById('filter-search')?.value||'').trim().toLowerCase();
+      const ip=(document.getElementById('filter-ip')?.value||'').trim().toLowerCase();
+      return { q, ip };
+    }
+    function getFilteredTableData(){
+      const { q, ip } = getFilters();
+      if(!q && !ip) return tableData;
+      return tableData.filter(r=>{
+        const sName=(r.name||'').toLowerCase();
+        const sOID=(r.oid||'').toLowerCase();
+        const sIP=(r.ip||'').toLowerCase();
+        const okQ = !q || sName.includes(q) || sOID.includes(q);
+        const okIP = !ip || sIP.includes(ip);
+        return okQ && okIP;
+      });
+    }
+    function onFilterChange(){ renderTable(); saveFilters(); }
+
+    // Table + de-dupe + badge sumber data
+    function sourceBadge(src){
+      if(src==='firestore') return '<span class="badge" style="background:rgba(16,185,129,.25)">FS</span>';
+      if(src==='backend') return '<span class="badge" style="background:rgba(59,130,246,.25)">BK</span>';
+      if(src==='dummy') return '<span class="badge" style="background:rgba(148,163,184,.25)">DM</span>';
+      return '<span class="badge" style="background:rgba(148,163,184,.2)">NA</span>';
+    }
+    function clearTable(){tableData=[];rowSeen.clear();document.getElementById('table-body').innerHTML='';logLine('# Table cleared')}
+    function renderTable(){
+      const tb=document.getElementById('table-body'); if(!tb) return;
+      const rows = getFilteredTableData();
+      tb.innerHTML=rows.map((r,i)=>`
+        <tr class="border-t border-slate-700">
+          <td class="p-2 text-gray-400">${rows.length - i}</td>
+          <td class="p-2">${r.name}</td>
+          <td class="p-2 mono">${r.oid}</td>
+          <td class="p-2">${r.value}</td>
+          <td class="p-2">${r.unit||''}</td>
+          <td class="p-2">${r.type||''}</td>
+          <td class="p-2">${r.category||''}</td>
+          <td class="p-2">${sourceBadge(r.source)}</td>
+          <td class="p-2">${r.ip}:${r.port}</td>
+          <td class="p-2">${String(r.ts).replace('T',' ').slice(0,19)}</td>
+        </tr>`).join('');
+    }
+    function pushRows(rows){
+      const add=[]; rows.forEach(r=>{
+        if(!r.source) r.source='backend'; // default jika tidak diset oleh caller
+        const k=rowKey(r); if(!rowSeen.has(k)){rowSeen.add(k); add.push(r);} 
+      });
+      if(!add.length) return;
+      tableData.unshift(...add); if(tableData.length>600) tableData.length=600;
+      renderTable(); appendRowsToCharts(add);
+    }
+    function setFsOptions(partial){ fsOptions = Object.assign({}, fsOptions, partial||{}); }
+    function resubscribe(){
+      if(window.unsubscribeFS){ try{ window.unsubscribeFS(); }catch{} window.unsubscribeFS=null; }
+      if(typeof window.startFirestoreListener==='function'){
+        window.unsubscribeFS=window.startFirestoreListener({
+          onRows:(rows)=>{ if(window.livePaused) return; pushRows(rows); },
+          maxDocs:200,
+          timeWindowMinutes: fsOptions.timeWindowMinutes || null,
+        });
+      }
+    }
+    function toggleLive(){
+      window.livePaused=!window.livePaused; const btn=document.getElementById('toggle-live-btn'); const badge=document.getElementById('live-badge');
+      if(window.livePaused){
+        btn.textContent='Resume Live'; badge.textContent='PAUSED'; badge.style.background='rgba(239,68,68,.25)'
+        if(window.unsubscribeFS){ try{ window.unsubscribeFS(); }catch{} window.unsubscribeFS=null; }
+      } else {
+        btn.textContent='Pause Live'; badge.textContent='LIVE'; badge.style.background='rgba(16,185,129,.25)'
+        resubscribe();
+      }
+      saveFilters();
+    }
+
+// CSV Export
+function exportCSV(){
+  const rows=getFilteredTableData();
+  if(!rows.length){ alert('No data to export'); return; }
+  const header=['Name','OID','Value','Unit','Type','Category','Source','IP','Port','Time'];
+  const csv=[header.join(',')].concat(rows.map(r=>[
+    JSON.stringify(r.name??''),
+    JSON.stringify(r.oid??''),
+    JSON.stringify(r.value??''),
+    JSON.stringify(r.unit??''),
+    JSON.stringify(r.type??''),
+    JSON.stringify(r.category??''),
+    JSON.stringify(r.source??''),
+    JSON.stringify(r.ip??''),
+    JSON.stringify(r.port??''),
+    JSON.stringify(String(r.ts).replace('T',' ').slice(0,19)),
+  ].join(','))).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='snmp_table.csv';
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+}
+
+    // Charts
+    function initializeCharts(){
+      if(Chart.getChart('tempHumidityChart')) Chart.getChart('tempHumidityChart').destroy();
+      if(Chart.getChart('voltageCurrentChart')) Chart.getChart('voltageCurrentChart').destroy();
+      const tctx=document.getElementById('tempHumidityChart').getContext('2d');
+      const vctx=document.getElementById('voltageCurrentChart').getContext('2d');
+      window.tempHumidityChart=new Chart(tctx,{type:'line',data:{labels:[],datasets:[
+        {label:'Temperature (°C)',data:[],borderColor:'#f87171',backgroundColor:'rgba(248,113,113,.2)',tension:.35},
+        {label:'Humidity (%RH)', data:[],borderColor:'#60a5fa',backgroundColor:'rgba(96,165,250,.2)',tension:.35}
+      ]}});
+      window.voltageCurrentChart=new Chart(vctx,{type:'line',data:{labels:[],datasets:[
+        {label:'Voltage (V)',data:[],borderColor:'#a78bfa',backgroundColor:'rgba(167,139,250,.2)',tension:.35},
+        {label:'Current (A)',data:[],borderColor:'#34d399',backgroundColor:'rgba(52,211,153,.2)',tension:.35}
+      ]}});
+    }
+    function appendRowsToCharts(rows){
+      if(!window.tempHumidityChart||!window.voltageCurrentChart) return;
+      const tC=window.tempHumidityChart, vC=window.voltageCurrentChart;
+      const label=new Date().toLocaleTimeString();
+      if(tC.data.labels[tC.data.labels.length-1]!==label){tC.data.labels.push(label); vC.data.labels.push(label);}    
+      const t=tC.data.datasets[0].data, h=tC.data.datasets[1].data, v=vC.data.datasets[0].data, c=vC.data.datasets[1].data;
+      rows.forEach(r=>{const nm=(r.name||'').toLowerCase(); const val=(typeof r.value==='number')?r.value:parseFloat(r.value);
+        if(!Number.isFinite(val)) return;
+        if(nm.includes('temp')) t.push(val); else if(nm.includes('humid')) h.push(val);
+        else if(nm.includes('volt')) v.push(val); else if(nm.includes('curr')) c.push(val);
+      });
+      [t,h,v,c,tC.data.labels,vC.data.labels].forEach(a=>{while(a.length>60) a.shift();});
+      tC.update(); vC.update();
+    }
+
+    // Direct Backend Call (GET/GETNEXT/WALK/SET)
+    async function runOp(op){
+      const ip=document.getElementById('ip').value.trim();
+      const port=parseInt(document.getElementById('port').value||'161',10);
+      const community=document.getElementById('community').value.trim();
+      const version=document.getElementById('version').value;
+      const oid=document.getElementById('oid').value.trim();
+      const v3={
+        user:document.getElementById('v3_user').value.trim(),
+        authProto:document.getElementById('v3_auth').value,
+        authKey:document.getElementById('v3_authKey').value,
+        privProto:document.getElementById('v3_priv').value,
+        privKey:document.getElementById('v3_privKey').value,
+      };
+
+      const payload={operation:op,ip,port,community,version,oid};
+      if(version==='v3') payload.v3=v3;
+
+      logLine(`# ${op.toUpperCase()} → ${ip}:${port} ${oid}`);
+      try{
+        const res=await fetch(getBackendUrl('/snmp'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+        const data=await res.json();
+        if(!res.ok){logLine(`# ERROR ${res.status}: ${JSON.stringify(data)}`);return;}
+
+        const rows=Array.isArray(data.rows)?data.rows:[];
+        // tandai sebagai backend; jika backend kirim flag dummy, hormati itu
+        if(rows.length){ rows.forEach(r=>{ if(!r.source) r.source = (r.dummy===true?'dummy':'backend'); }); }
+        if(!window.livePaused && rows.length) pushRows(rows);
+        logLine(`# OK: ${op} received ${rows.length||0} rows`);
+      }catch(e){
+        logLine(`# fetch error: ${e?.message||e}`);
+      }
+    }
+    function doSet(){
+      const val=prompt("Enter value to SET:"); if(!val) return;
+      const ip=document.getElementById('ip').value.trim();
+      const port=parseInt(document.getElementById('port').value||'161',10);
+      const community=document.getElementById('community').value.trim();
+      const version=document.getElementById('version').value;
+      const oid=document.getElementById('oid').value.trim();
+      const v3={
+        user:document.getElementById('v3_user').value.trim(),
+        authProto:document.getElementById('v3_auth').value,
+        authKey:document.getElementById('v3_authKey').value,
+        privProto:document.getElementById('v3_priv').value,
+        privKey:document.getElementById('v3_privKey').value,
+      };
+      const payload={operation:'set',ip,port,community,version,oid,setValue:val};
+      if(version==='v3') payload.v3=v3;
+      logLine(`# SET "${val}" → ${ip}:${port} ${oid}`);
+      fetch(getBackendUrl('/snmp'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+        .then(r=>r.json().then(j=>({ok:r.ok,body:j}))).then(({ok,body})=>{
+          if(!ok) logLine(`# ERROR: ${JSON.stringify(body)}`);
+          else{ const rows=Array.isArray(body.rows)?body.rows:[]; if(rows.length){ rows.forEach(r=>{ if(!r.source) r.source = (r.dummy===true?'dummy':'backend'); }); } if(!window.livePaused&&rows.length) pushRows(rows); logLine(`# OK: SET result ${rows.length||0} rows`); }
+        }).catch(e=>logLine(`# fetch error: ${e?.message||e}`));
+    }
+
+    // Start listener after ready
+    window.onload=function(){
+      showPage('snmp-table'); initializeCharts();
+
+      // load persisted filters first
+      loadFilters();
+
+      // bind filters + debounce
+      const debouncedFilter = debounce(onFilterChange, 300);
+      document.getElementById('filter-search').addEventListener('input', debouncedFilter);
+      document.getElementById('filter-ip').addEventListener('input', debouncedFilter);
+      document.getElementById('time-window').addEventListener('change', (e)=>{
+        const minutes=parseInt(e.target.value,10)||0;
+        setFsOptions({timeWindowMinutes: minutes});
+        saveFilters();
+        resubscribe();
+      });
+
+      // init timeWindowMinutes from persisted value
+      const tw=document.getElementById('time-window').value; fsOptions.timeWindowMinutes = parseInt(tw||'15',10) || 0;
+
+      const wait=setInterval(()=>{
+        if(window.isFirebaseReady && window.db){
+          clearInterval(wait);
+          if(!window.livePaused){ resubscribe(); } // if paused, do not subscribe until resume
+        }
+      },300);
+    }
+  </script>
+</body>
+</html>

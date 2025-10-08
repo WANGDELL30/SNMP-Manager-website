@@ -6,6 +6,10 @@ from flask_cors import CORS
 
 from routes_snmp import api  # blueprint
 
+# ADNAN KONTOL
+
+
+
 APP_ID = os.getenv("APP_ID", "default-app-id")
 CORS_ORIGINS = [
     o.strip() for o in os.getenv(

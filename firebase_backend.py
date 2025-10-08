@@ -12,6 +12,8 @@
 #   - Logging prefiks konsisten
 # -----------------------------------------------------------------------------
 
+# coding salah
+
 from __future__ import annotations
 
 import os

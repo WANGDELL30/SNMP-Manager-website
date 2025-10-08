@@ -14,6 +14,7 @@
 
 # coding salah
 # adnan belom mandi anjing
+#pip tolong rapihin
 
 from __future__ import annotations
 

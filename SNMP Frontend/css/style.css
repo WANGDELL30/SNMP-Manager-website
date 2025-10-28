@@ -1,0 +1,131 @@
+/* Definisikan variabel warna */
+:root {
+  --bg-start: #0f172a;
+  --bg-end: #334155;
+  --glass-bg: rgba(30,41,59,.7);
+  --glass-border: rgba(148,163,184,.2);
+  --text-primary: #fff;
+  --text-secondary: #94a3b8;
+  --table-header-bg: rgba(30,41,59,.7);
+  --table-border: #475569;
+}
+
+/* Aturan untuk mode terang */
+body.light-mode {
+  --bg-start: #f1f5f9;
+  --bg-end: #e2e8f0;
+  --glass-bg: rgba(255,255,255,.8);
+  --glass-border: rgba(203,213,225,.6);
+  --text-primary: #000; /* Warna teks utama menjadi hitam */
+  --text-secondary: #4a5568;
+  --table-header-bg: rgba(226,232,240,.7);
+  --table-border: #cbd5e1;
+}
+
+* { box-sizing: border-box; }
+body {
+  font-family: 'Inter', sans-serif;
+  background: linear-gradient(135deg, var(--bg-start), var(--bg-end));
+  min-height: 100vh;
+  overflow-x: hidden;
+  color: var(--text-secondary);
+  transition: background .5s ease; /* Transisi untuk perubahan latar belakang */
+}
+
+header h1 {
+  font-family: 'Fjalla One', sans-serif;
+  color: var(--text-primary);
+}
+
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: 1.25rem;
+  box-shadow: 0 25px 50px -12px rgba(0,0,0,.5);
+  transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease, background .5s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 30px 60px -15px rgba(0,0,0,.55);
+  border-color: rgba(148,163,184,.35);
+}
+
+.btn {
+  border-radius: 9999px;
+  font-weight: 600;
+  padding: .6rem 1.2rem;
+  transition: transform .15s ease, filter .2s ease, box-shadow .2s ease;
+}
+.btn-1 { background: linear-gradient(135deg,#3b82f6,#6366f1); color:#fff; }
+.btn-2 { background: linear-gradient(135deg,#10b981,#059669); color:#fff; }
+.btn-3 { background: linear-gradient(135deg,#64748b,#475569); color:#fff; }
+
+.btn:hover { filter: brightness(1.07); }
+.btn-press:active { transform: translateY(1px) scale(.98); }
+
+.page { display:none; }
+.page.active { 
+  display:block;
+  animation: fadeIn .5s ease-in-out; /* Animasi fade-in saat halaman aktif */
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.chart-wrap {
+  height: 320px;
+  border-radius: 1rem;
+  padding: 1rem;
+  border: 1px solid rgba(148,163,184,.2);
+  background: rgba(30,41,59,.5);
+}
+
+.badge {
+  font-size: .75rem;
+  padding: .15rem .5rem;
+  background: rgba(148,163,184,.2);
+  border-radius: 999px;
+  color: var(--text-secondary);
+}
+
+.mono {
+  font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,'Liberation Mono','Courier New',monospace;
+}
+
+.input, .select {
+  background: var(--bg-start);
+  color: var(--text-primary);
+  padding: .5rem .75rem;
+  border-radius: .5rem;
+  border: 1px solid var(--glass-border);
+  outline: 0;
+  width: 100%;
+  transition: border-color .2s ease, box-shadow .2s ease;
+}
+.input:focus, .select:focus {
+  border-color: rgba(59,130,246,.6);
+  box-shadow: 0 0 0 3px rgba(59,130,246,.25);
+}
+
+/* Update text colors and table styles */
+.text-white { color: var(--text-primary); }
+.text-gray-400 { color: var(--text-secondary); }
+.text-gray-300 { color: var(--text-secondary); }
+.text-gray-200 { color: var(--text-primary); }
+.bg-slate-800\/60 { background: var(--table-header-bg); }
+.border-t.border-slate-700 { border-color: var(--table-border); }
+
+/* Animasi untuk baris tabel */
+.table-row-fade-in {
+  animation: fadeInRow .5s ease-out;
+}
+
+@keyframes fadeInRow {
+  from { opacity: 0; transform: translateX(-10px); }
+  to { opacity: 1; transform: translateX(0); }
+
+}
